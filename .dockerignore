@@ -1,0 +1,18 @@
+# Ignore any deveopment environment artifacts
+etc
+.git
+*.sw*
+.python-version
+.bumpversion.cfg
+docker-compose.yml
+Dockerfile
+Makefile
+MANIFEST.in
+requirements.dev.txt
+.DS_Store
+.idea
+*.bak
+tags
+config.codekit3
+docker-compose*
+.mypy_cache
