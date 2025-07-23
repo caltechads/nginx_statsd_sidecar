@@ -27,7 +27,7 @@ setup(
         # https://github.com/Gr1N/aiodogstatsd
         'aiodogstatsd==0.16.0.post0',
         # https://github.com/samuelcolvin/pydantic
-        'pydantic>=1.9.0',
+        'pydantic-settings~=2.10',
         # https://github.com/hynek/structlog
         'python-json-logger==2.0.7',
         # https://github.com/pallets/click
