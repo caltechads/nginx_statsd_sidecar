@@ -36,9 +36,9 @@ configurable via an environment variable).
 
 Include the `nginx_statsd_sidecar` container in the same task definition as the
 container you are wanting to monitor, and add a link from the
-`nginx_statsd_sidecar` container to the container you want to monitor.  similar
-to the following example:
+`nginx_statsd_sidecar` container to the container you want to monitor.  For example:
 
+```
 {
     ...
     "containerDefinitions": [
@@ -89,6 +89,7 @@ to the following example:
     ]
     ...
 }
+```
 
 ## Contributing to the code
 

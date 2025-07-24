@@ -2,7 +2,7 @@ VERSION = 0.1.0
 
 PACKAGE = nginx_statsd_sidecar
 
-DOCKER_REGISTRY = caltechads/nginx_statsd_sidecar
+DOCKER_REGISTRY = caltechads
 
 #======================================================================
 
