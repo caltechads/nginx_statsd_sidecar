@@ -11,11 +11,14 @@ clean:
 	find . -name "*.pyc" -exec rm '{}' ';'
 
 dist: clean
-	@python setup.py sdist
-	@python setup.py bdist_wheel --universal
+	@uv build --sdist --wheel
 
 release: dist
-	@twine upload dist/*
+	@bin/release.sh
+
+compile: uv.lock
+	@uv pip compile --group=docs pyproject.toml -o requirements.txt
+
 
 build:
 	docker build -t ${PACKAGE}:${VERSION} .
@@ -36,26 +39,29 @@ push: tag
 pull:
 	docker pull ${DOCKER_REGISTRY}/${PACKAGE}:${VERSION}
 
+scout:
+	docker scout cves --only-severity=critical,high ${PACKAGE}:${VERSION}
+
 dev:
-	docker-compose up
+	docker compose up
 
 dev-detached:
-	docker-compose up -d
+	docker compose up -d
 
 devdown:
-	docker-compose down
+	docker compose down
 
 restart:
-	docker-compose restart nginx_statsd_sidecar
+	docker compose restart nginx_statsd_sidecar
 
 exec:
 	docker exec -it nginx_statsd_sidecar /bin/bash
 
 log:
-	docker-compose logs -f nginx_statsd_sidecar
+	docker compose logs -f nginx_statsd_sidecar
 
 logall:
-	docker-compose logs -f
+	docker compose logs -f
 
 docker-clean:
 	docker stop $(shell docker ps -a -q)

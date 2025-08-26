@@ -38,7 +38,7 @@ Include the `nginx_statsd_sidecar` container in the same task definition as the
 container you are wanting to monitor, and add a link from the
 `nginx_statsd_sidecar` container to the container you want to monitor.  For example:
 
-```
+```json
 {
     ...
     "containerDefinitions": [
