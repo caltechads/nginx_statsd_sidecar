@@ -1,7 +1,8 @@
 Coding Standards
 ================
 
-This guide outlines the coding standards and best practices for contributing to the rstbuddy project.
+This guide outlines the coding standards and best practices for contributing to
+the ``nginx_statsd_sidecar`` project.
 
 Code Style
 ----------
@@ -9,9 +10,9 @@ Code Style
 **Python Code Style**
     - Follow PEP 8 style guidelines
     - Use 4 spaces for indentation (no tabs)
-    - Maximum line length of 88 characters (Black formatter)
+    - Maximum line length of 88 characters (ruff formatter)
     - Use descriptive variable and function names
-    - Include type hints for all function parameters and return values
+    - Include python 3.10+ type hints for all function parameters and return values
 
 **Import Organization**
     - Group imports: standard library, third-party, local
@@ -78,35 +79,6 @@ Testing Standards
     - Test error handling and edge cases
     - Verify output format and content
 
-Example Test Structure
-^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-    """Test RST link checking functionality."""
-
-    import pytest
-    from pathlib import Path
-    from rstbuddy.services.rst_link_checker import RSTLinkChecker
-
-    class TestRSTLinkChecker:
-        """Test cases for RST link checker."""
-
-        @pytest.fixture
-        def temp_rst_file(self, tmp_path):
-            """Create temporary RST file for testing."""
-            rst_file = tmp_path / "test.rst"
-            rst_file.write_text("Test content with :ref:`label`")
-            return rst_file
-
-        def test_check_links_finds_broken_refs(self, temp_rst_file):
-            """Test that broken :ref: links are detected."""
-            checker = RSTLinkChecker(temp_rst_file.parent)
-            broken_links = checker.check()
-
-            assert len(broken_links) == 1
-            assert ":ref:`label`" in broken_links[0].link_text
-
 Error Handling
 --------------
 
@@ -169,23 +141,6 @@ Performance Considerations
     - Implement proper error handling in concurrent code
     - Use appropriate worker counts for your environment
     - Consider async/await for complex I/O operations
-
-Example Performance Optimization
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-    """Process files efficiently with generators."""
-
-    def process_rst_files(directory: Path):
-        """Process RST files without loading all content into memory."""
-        for rst_file in directory.rglob("*.rst"):
-            try:
-                with rst_file.open(encoding="utf-8") as f:
-                    for line_num, line in enumerate(f, 1):
-                        yield process_line(line, rst_file, line_num)
-            except OSError as e:
-                logger.warning(f"Could not read {rst_file}: {e}")
 
 Security Considerations
 -----------------------
@@ -258,34 +213,6 @@ Documentation Standards
     - Document return values and exceptions
     - Provide code examples for complex operations
 
-Example API Documentation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-    """RST link checker service.
-
-    This service provides comprehensive link validation for RST files,
-    including external HTTP(S) links, Sphinx roles, and directive paths.
-
-    Example:
-        >>> checker = RSTLinkChecker(Path("docs"))
-        >>> broken_links = checker.check()
-        >>> for link in broken_links:
-        ...     print(f"Broken link in {link.file_path}:{link.line_number}")
-    """
-
-    class RSTLinkChecker:
-        """Scan RST files for broken links and validate them.
-
-        Args:
-            root: Directory to recursively scan for RST files.
-
-        Attributes:
-            root: Root directory for scanning.
-            settings: Configuration settings.
-        """
-
 Commit Standards
 ----------------
 
@@ -353,9 +280,3 @@ If you have questions about coding standards:
 2. **Review Style Guide**: Follow PEP 8 and project-specific guidelines
 3. **Ask Questions**: Use GitHub discussions or issues
 4. **Request Review**: Get feedback on your code early
-
-**Resources**:
-    - `PepsPythonOrgPep-0008`_
-    - `GoogleGithubIoPyguide`_
-    - `BlackReadthedocsIo`_
-    - `MypyReadthedocsIo`_

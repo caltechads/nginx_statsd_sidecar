@@ -9,13 +9,13 @@ Instructions for contributors
 Workflow is pretty straightforward:
 
 1. Fork the repository.
-2. Checkout your fork: ``git clone https://github.com/your-username/rstbuddy.git``
+2. Checkout your fork: ``git clone https://github.com/your-username/nginx_statsd_sidecar.git``
 3. Setup your machine with the required development environment
 4. Make your changes, adding or updating tests as appropriate.
 5. Update the Sphinx documentation to reflect your changes.
 6. ``cd doc; make clean && make html; open build/html/index.html``.  Ensure the docs build without crashing and then review the docs for accuracy.
 7. Commit your changes into master.
-8. Create a pull request at `GithubComPulls`_ and wait for it to be reviewed and merged.
+8. Create a pull request at `GitHub <https://github.com/caltechads/nginx_statsd_sidecar/pulls>`_ and wait for it to be reviewed and merged.
 
 
 Setting up your development environment
@@ -42,16 +42,6 @@ Managing dependencies
 - Use ``uv add <package>`` to add a main dependency package to the project.
 - Use ``uv add --group=test <package>`` to add a testing dependency package to the project.
 - Use ``uv add --group=docs <package>`` to add a documentation dependency package to the project.
-
-
-Testing
--------
-
-We use ``pytest`` to run the tests.  Add tests for any new functionality you add to the ``tests/`` folder.  To run the tests, use the following command:
-
-.. code-block:: shell
-
-    $ pytest -v tests/
 
 
 Updating the documentation

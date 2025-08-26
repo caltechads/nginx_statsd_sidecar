@@ -1,356 +1,141 @@
 Frequently Asked Questions
 ==========================
 
-This section addresses common questions and troubleshooting scenarios for ``rstbuddy``.
+This section addresses common questions and troubleshooting scenarios for ``nginx_statsd_sidecar``.
 
-Link Checking
--------------
+I never see hits to the ``ngx_http_stub_status_module`` endpoint in ``nginx``
+-----------------------------------------------------------------------------
 
-Why are some links showing as broken when they work in my browser?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+You're up and running, but when you check your application logs, you don't see
+any hits to the ``ngx_http_stub_status_module`` endpoint in ``nginx``.
 
-This is a common issue caused by several factors:
+You should see something like this in the ``nginx_statsd_sidecar`` logs:
 
-**Web Application Firewalls (WAF)**
+.. code-block:: json
 
-    - **Cloudflare**: Often blocks automated tools and bots
-    - **AWS WAF**: May have rate limiting or user-agent filtering
-    - **Custom WAFs**: May block requests that don't look like human browsers
+    {"message": "scraper.init url=https://myapp:8443/server-status"}
 
-**Rate Limiting**
+.. note::
 
-    - Some servers limit requests from the same IP address
-    - Multiple concurrent requests may trigger temporary blocks
-    - Servers may have different limits for different user agents
+    This line will, of course, be different depending on what you configured as ``NGINX_HOST``, ``NGINX_STATUS_PATH``
+    and ``NGINX_PORT`` to be.
 
-**User-Agent Filtering**
+The ``url`` in the log is the URL that ``nginx_statsd_sidecar`` has been configured with to GET the stats from the ``ngx_http_stub_status_module`` endpoint in ``nginx``.
 
-    - Some sites reject requests with certain user agents
-    - The default user agent ``rstbuddy-linkcheck/1.0`` may be blocked
-    - Some sites only allow requests from major browsers
+- Is ``myapp:8443`` the correct host and port?
+- Are you not logging the ``nginx_statsd_sidecar`` hits (aka you have ``access_log off`` in your ``location = /server-status`` block)?
 
-**Solutions**:
+If you're not sure, you can try to reach the endpoint from the ``nginx_statsd_sidecar`` container using ``curl``:
 
-    - **Manual Verification**: Always check broken links manually in a browser
-    - **Custom User-Agent**: Use ``--user-agent "Mozilla/5.0..."`` to mimic a browser
-    - **Rate Limiting**: Increase ``--timeout`` and reduce ``--max-workers``
-    - **Skip Domains**: Add problematic domains to ``check_rst_links_skip_domains``
+.. code-block:: bash
 
-How can I tell if a link is actually broken or just blocked?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    curl -s https://myapp:8443/server-status
 
-**Check the Error Details**:
+I see the hits from ``nginx_statsd_sidecar`` in ``nginx`` logs, but they all return 401/403
+-------------------------------------------------------------------------------------------
 
-    - **HTTP 403/429**: Usually indicates blocking (WAF, rate limiting)
-    - **HTTP 5xx**: Server errors (may be temporary)
-    - **Connection Timeout**: Network issues or blocking
-    - **DNS Resolution Failure**: Link is actually broken
+You're up and running, but when you check your ``nginx`` logs, you see hits to
+the ``ngx_http_stub_status_module`` endpoint, but they all return 401/403.
 
-**Manual Verification Steps**:
+You should see something like this in the ``nginx`` logs:
 
-    1. Copy the URL and paste it in a browser
-    2. Try different browsers (Chrome, Firefox, Safari)
-    3. Check if the site has a status page
-    4. Try accessing from a different network
-    5. Check if the site requires JavaScript or cookies
+.. code-block:: json
 
-**Configuration Solutions**:
+    {"message": "HTTP Request: GET https://nginx:8443/server-status \"HTTP/2 401 Unauthorized\""}
 
-    - Add problematic domains to your configuration
-    - Use longer timeouts for slow-responding sites
-    - Skip robots.txt checks for problematic sites
+.. note::
 
-What should I do about robots.txt violations?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    This line will, of course, be different depending on what you configured as ``NGINX_HOST``, ``NGINX_STATUS_PATH``
+    and ``NGINX_PORT`` to be.
 
-**Understanding robots.txt**:
+- In your ``location = /server-status`` block, are you restricting access to the endpoint?
 
-    - The ``robots_disallowed`` flag indicates the site's robots.txt blocks your user agent
-    - This doesn't necessarily mean the link is broken
-    - It means the site doesn't want automated tools to access it
+    - If you're using ``allow`` and ``deny`` directives, make sure that the ``nginx_statsd_sidecar`` container's IP address is in the ``allow`` list.
 
-**Handling Options**:
+        - For ECS, this will be 127.0.0.1, and the IPv6 equivalent ``::1`` since the container runs on the same host as your application.
+        - Otherwise, see what your ``nginx_statsd_sidecar`` container's IP address is and ensure that it is in the ``allow`` list.
 
-    1. **Respect robots.txt** (default): Skip these links in future runs
-    2. **Ignore robots.txt**: Use ``--no-check-robots`` flag
-    3. **Custom User-Agent**: Use a user agent that's allowed by robots.txt
-    4. **Manual Verification**: Check these links manually in a browser
 
-**Best Practices**:
+I see the hits from ``nginx_statsd_sidecar`` in ``nginx`` logs, but they all return 404
+---------------------------------------------------------------------------------------
 
-    - Respect robots.txt for production environments
-    - Use ``--no-check-robots`` only for development/testing
-    - Consider adding blocked domains to your skip list
+Again look at the ``nginx_statsd_sidecar`` logs to see if you can see this line:
 
-RST File Cleaning
------------------
+.. code-block:: json
 
-Why isn't rstbuddy fixing my Markdown headings?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    {"message": "HTTP Request: GET https://nginx:8443/server-status \"HTTP/2 404 Not Found\""}
 
-**Common Causes**:
-    - **Protected Content**: Lines match patterns in ``clean_rst_extra_protected_regexes``
-    - **Directive Content**: Headings inside RST directives are protected
-    - **Code Blocks**: Content inside fenced code blocks is ignored
-    - **Invalid Syntax**: Markdown syntax doesn't match expected patterns
+.. note::
 
-**Troubleshooting**:
-    - Use ``--dry-run`` to see what would be changed
-    - Check if headings are inside protected directives
-    - Verify Markdown syntax is correct
-    - Review your protected regex patterns
+    This line will, of course, be different depending on what you configured as ``NGINX_HOST``, ``NGINX_STATUS_PATH``
+    and ``NGINX_PORT`` to be.
 
-**Examples of Protected Content**:
-    - Headings inside ``.. code-block::`` directives
-    - Content matching custom protected patterns
-    - Lines inside any RST directive content
+If you see the hits from ``nginx_statsd_sidecar`` in ``nginx`` logs, but they all return 404, there are a few things you can check:
 
-How does rstbuddy decide what to fix?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- Is ``ngx_http_stub_status_module`` enabled in ``nginx``?
+- Is the ``/server-status`` endpoint enabled in ``nginx`` as ``location = /server-status`` (or whatever you configured as ``NGINX_STATUS_PATH``)?
 
-**Fix Priority Order**:
-    1. **Code Block Conversion**: Convert Markdown fences to RST directives
-    2. **Heading Conversion**: Convert Markdown ATX headings to RST
-    3. **Heading Normalization**: Fix RST heading underlines
-    4. **Inline Code**: Convert backtick spans to RST literals
-    5. **List Spacing**: Ensure proper spacing around lists
-    6. **Stray Fence Removal**: Clean up orphaned backticks
+Stats seem to be being gathered, but not being reported to statsd
+-----------------------------------------------------------------
 
-**Protection Rules**:
+``nginx_statsd_sidecar`` will log each time it scrapes stats from ``nginx`` and reports them to ``statsd``, in JSON format.
 
-    - **Directives**: Content inside RST directives is protected
-    - **Code Blocks**: Fenced code blocks are preserved
-    - **Custom Patterns**: Lines matching protected regexes are ignored
-    - **Admonitions**: Links inside admonitions are preserved
+You should see something like this in the logs:
 
-**Safety Features**:
+.. code-block:: json
 
-    - Always creates backups before making changes
-    - Uses conservative heuristics to avoid breaking content
-    - Preserves RST-specific constructs
-    - Ignores content that might be intentionally formatted
+    {"message": "scraper.init url=https://myapp:8443/server-status"}
+    {"message": "HTTP Request: GET https://nginx/server-status \"HTTP/2 200 OK\""}
+    {"message": "reporter.success", "retrieved": true, "active_connections": 1, "requests": 4, "reading": 0, "writing": 1, "waiting": 0}
 
-AI Summarization
-----------------
+If you see this last line (``reporter.success``), but the stats are not being
+reported to ``statsd``, there are a few things you can check:
 
-Why do I get "OpenAI API key required" errors?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Common Causes**:
+1. Are you looking in the right place for the ``statsd`` stats in your backend storage?
 
-    - **No API Key**: API key not set in configuration or environment
-    - **Invalid Key**: API key is malformed or expired
-    - **Configuration Not Loaded**: Config file not found or not parsed
-    - **Environment Variable**: API key not exported or cleared
+    - If you're using graphite, you'll want to look in the ``stats.${STATSD_PREFIX}.`` prefix.
+    - I've never used any other backend storage for ``statsd``, so I can't say for sure what the correct prefix is for InfluxDB, for example.
 
-**Setup Steps**:
-    1. **Get API Key**: Sign up at `PlatformOpenaiCom`_
-    2. **Set in Config**: Add to your configuration (see :doc:`/overview/configuration`)
-    3. **Verify**: Run ``rstbuddy settings`` to check
+2. Check that the ``statsd`` host is reachable from the ``nginx_statsd_sidecar`` container
 
-**Configuration File Example**:
-    .. code-block:: toml
-
-        # ~/.config/.rstbuddy.toml
-        openai_api_key = "sk-your-actual-api-key-here"
-
-**Environment Variable Example**:
-    .. code-block:: bash
-
-        export RSTBUDDY_OPENAI_API_KEY="sk-your-actual-api-key-here"
-        rstbuddy summarize document.rst
-
-Why do I get "pandoc: command not found" errors?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Pandoc Requirement**:
-
-    - The ``summarize`` command requires Pandoc to convert RST to Markdown
-    - Pandoc is not included with rstbuddy
-    - Must be installed separately on your system
-
-**Installation Options**:
-
-    - **macOS**: ``brew install pandoc``
-    - **Ubuntu/Debian**: ``sudo apt install pandoc``
-    - **Windows**: Download from `PandocOrgInstalling`_
-
-**Verification**:
-    .. code-block:: bash
-
-        # Check if pandoc is installed
-        pandoc --version
-
-        # Check if it's in PATH
-        which pandoc
-
-Performance and Configuration
------------------------------
-
-Why is link checking so slow?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Common Bottlenecks**:
-
-    - **Network Latency**: Slow response times from external sites
-    - **Rate Limiting**: Servers throttling requests
-    - **Large Documentation**: Many files or links to check
-    - **Default Settings**: Conservative timeout and worker settings
-
-**Optimization Options**:
-
-    - **Increase Workers**: Use ``--max-workers 16`` or higher
-    - **Reduce Timeout**: Use ``--timeout 3`` for faster failures
-    - **Skip Domains**: Add slow sites to ``check_rst_links_skip_domains``
-    - **Parallel Processing**: Link checking is already concurrent
-
-**Performance Tips**:
-
-    - Run during off-peak hours
-    - Use appropriate worker counts for your network
-    - Skip problematic domains
-    - Consider running in CI/CD during quiet periods
-
-How can I customize what gets checked or fixed?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Link Checking Customization**:
-
-    - **Skip Domains**: Add to ``check_rst_links_skip_domains``
-    - **Skip Directives**: Add to ``check_rst_links_extra_skip_directives``
-    - **Custom User-Agent**: Use ``--user-agent`` flag
-    - **Robots.txt**: Control with ``--no-check-robots``
-
-**RST Cleaning Customization**:
-
-    - **Protected Patterns**: Add regexes to ``clean_rst_extra_protected_regexes``
-    - **Dry Run**: Use ``--dry-run`` to preview changes
-    - **Selective Processing**: Process files individually
-
-**Configuration Examples**:
-    .. code-block:: toml
-
-        # Skip problematic domains
-        check_rst_links_skip_domains = [
-            "cloudflare.com",
-            "waf.example.com",
-            "rate-limited.site"
-        ]
-
-        # Protect custom patterns
-        clean_rst_extra_protected_regexes = [
-            "\\bPROTECTED\\b",
-            "\\bDO_NOT_MODIFY\\b"
-        ]
-
-Output and Formatting
----------------------
-
-How can I integrate rstbuddy into my CI/CD pipeline?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Basic Integration**:
-    .. code-block:: yaml
-
-        # GitHub Actions example
-
-        - name: Check RST Links
-
-          run: |
-            pip install rstbuddy
-            rstbuddy check-links
-
-**Advanced Integration**:
-    .. code-block:: yaml
-
-        # With custom configuration
-
-        - name: Check RST Links
-
-          run: |
-            pip install rstbuddy
-            echo "check_rst_links_skip_domains = ['test.example.com']" > .rstbuddy.toml
-            rstbuddy check-links --timeout 10 --max-workers 16
-
-**JSON Output for Automation**:
-    .. code-block:: yaml
-
-        - name: Check Links and Generate Report
-
-          run: |
-            rstbuddy --output json check-links > link_report.json
-            # Process JSON report in subsequent steps
-
-**Exit Code Handling**:
-
-    - **Exit 0**: All links are valid
-    - **Exit 1**: Broken links found
-    - Use exit codes to fail builds when needed
-
-Troubleshooting
----------------
-
-How do I debug configuration issues?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Configuration Debugging**:
-    .. code-block:: bash
-
-        # Show current settings
-        rstbuddy settings
-
-        # Show with verbose output
-        rstbuddy --verbose settings
-
-        # Check config file loading
-        rstbuddy --config-file /path/to/config.toml settings
-
-**Common Issues**:
-
-    - **File Not Found**: Check config file paths and permissions
-    - **Syntax Errors**: Validate TOML syntax
-    - **Environment Variables**: Check variable names and values
-    - **File Permissions**: Ensure config files are readable
-
-**Configuration Validation**:
-
-    - Use online TOML validators
-    - Check file permissions
-    - Verify environment variable names
-    - Test with minimal configuration
-
-What should I do if rstbuddy crashes or hangs?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Common Causes**:
-
-    - **Network Issues**: Hanging HTTP requests
-    - **Large Files**: Processing very large RST files
-    - **Memory Issues**: Insufficient system resources
-    - **Infinite Loops**: Complex regex patterns
-
-**Recovery Steps**:
-
-    1. **Kill Process**: Use Ctrl+C or kill command
-    2. **Check Logs**: Look for error messages
-    3. **Reduce Scope**: Process smaller batches
-    4. **Check Resources**: Monitor CPU and memory usage
-
-**Prevention**:
-
-    - Use appropriate timeouts
-    - Process files in smaller batches
-    - Monitor system resources
-    - Test with sample files first
-
-**Debug Mode**:
-    .. code-block:: bash
-
-        # Enable verbose output
-        rstbuddy --verbose check-links
-
-        # Use dry run for cleaning
-        rstbuddy fix document.rst --dry-run
+    - Its domain name resolves (``host statsd.example.com``)
+    - You can reach it from the ``nginx_statsd_sidecar`` container.  The container has ``nmap`` installed,  So you can
+      run ``nmap -sU statsd.example.com`` to see if UDP port 8125 is open and reachable.
+
+3. If possible, look at the ``statsd`` logs to see if the metrics are being accepted.  You should see something like this:
+
+    .. code-block:: text
+
+       {
+         counters: {
+           'statsd.bad_lines_seen': 0,
+           'statsd.packets_received': 5,
+           'statsd.metrics_received': 5,
+           'myapp.nginx.requests': 1,
+           'myapp.nginx.active_connections': 1,
+           'myapp.nginx.workers.reading': 0,
+           'myapp.nginx.workers.writing': 1,
+           'myapp.nginx.workers.waiting': 0
+         },
+         timers: {},
+         gauges: { 'statsd.timestamp_lag': 0 },
+         timer_data: {},
+         counter_rates: {
+           'statsd.bad_lines_seen': 0,
+           'statsd.packets_received': 0.5,
+           'statsd.metrics_received': 0.5,
+           'myapp.nginx.requests': 0.1,
+           'myapp.nginx.active_connections': 0.1,
+           'myapp.nginx.workers.reading': 0,
+           'myapp.nginx.workers.writing': 0.1,
+           'myapp.nginx.workers.waiting': 0
+         },
+         sets: {},
+         pctThreshold: [ 90 ]
+       }
+
+4. Check that the backend storage for ``statsd`` is not full and thus cannot accept new metrics
 
 Getting Help
 ------------
@@ -360,7 +145,7 @@ Where can I get more help?
 
 **Documentation**:
 
-    - **Usage Guide**: :doc:`/overview/usage` for detailed command information
+    - **Usage Guide**: :doc:`/overview/installation` for detailed nginx and ``nginx_statsd_sidecar`` setup options
     - **Configuration**: :doc:`/overview/configuration` for setup options
     - **Quickstart**: :doc:`/overview/quickstart` for basic examples
 
@@ -368,18 +153,9 @@ Where can I get more help?
 
     - Check this FAQ section
     - Review error messages carefully
-    - Use ``--verbose`` flag for debugging
-    - Test with minimal examples
 
 **Community Support**:
 
     - GitHub Issues: Report bugs and request features
     - GitHub Discussions: Ask questions and share solutions
     - Documentation Issues: Report documentation problems
-
-**Best Practices**:
-
-    - Always test with sample files first
-    - Use dry-run mode when possible
-    - Keep backups of important files
-    - Monitor system resources during processing

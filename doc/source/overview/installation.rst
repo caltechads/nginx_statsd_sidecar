@@ -1,430 +1,224 @@
 Installation Guide
 ==================
 
-This guide covers installing ``rstbuddy`` on different platforms and systems.
+This guide covers installing ``nginx_statsd_sidecar``.
+
+``nginx_statsd_sidecar`` is a Docker container that runs ``nginx`` and ``statsd`` and forwards the metrics to ``statsd``.
 
 Prerequisites
 -------------
 
 **System Requirements**
-    - Python 3.10 or higher
-    - pip, pipx, or uv package manager
-    - Internet connection for package downloads
-
-**Optional Dependencies**
-    - **Pandoc**: Required only for AI summarization feature
-    - **OpenAI API Key**: Required only for AI summarization feature
+    - Something that can run Docker containers: Docker Desktop, ECS, containerd, Kubernetes, etc.
+    - An ``nginx`` container configured with the `ngx_http_stub_status_module <https://nginx.org/en/docs/http/ngx_http_stub_status_module.html>`_ enabled
 
 Installation Methods
 --------------------
 
-Using uv (Recommended)
-^^^^^^^^^^^^^^^^^^^^^^
-
-`DocsAstralShUv`_ is a fast Python package installer and resolver.
-
-**Install uv**:
-    .. code-block:: bash
-
-        # macOS/Linux
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-
-        # Windows
-        powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-**Install rstbuddy**:
-    .. code-block:: bash
-
-        # Install globally
-        uv tool install rstbuddy
-
-        # Verify installation
-        rstbuddy --version
-
-Using pipx
-^^^^^^^^^^
-
-`PypaGithubIoPipx`_ installs Python applications in isolated environments.
-
-**Install pipx**:
-    .. code-block:: bash
-
-        # macOS
-        brew install pipx
-        pipx ensurepath
-
-        # Ubuntu/Debian
-        sudo apt update
-        sudo apt install pipx
-        pipx ensurepath
-
-        # Windows
-        python -m pip install --user pipx
-        python -m pipx ensurepath
-
-**Install rstbuddy**:
-    .. code-block:: bash
-
-        # Install globally
-        pipx install rstbuddy
-
-        # Verify installation
-        rstbuddy --version
-
-Using pip
-^^^^^^^^^
-
-Standard pip installation (not recommended for command-line tools).
-
-**Install rstbuddy**:
-    .. code-block:: bash
-
-        # Install globally (requires sudo on Unix-like systems)
-        pip install rstbuddy
-
-        # Install for current user only
-        pip install --user rstbuddy
-
-        # Verify installation
-        rstbuddy --version
-
-From Source
-^^^^^^^^^^^
-
-Build and install from the source code.
-
-**Clone and Install**:
-    .. code-block:: bash
-
-        # Clone the repository
-        git clone https://github.com/your-org/rstbuddy.git
-        cd rstbuddy
-
-        # Install in development mode
-        uv sync
-        uv run pip install -e .
-
-        # Or using pip
-        pip install -e .
-
-Verification
-------------
-
-After installation, verify that rstbuddy is working correctly:
-
-.. code-block:: bash
-
-    # Check version
-    rstbuddy --version
-
-    # Show help
-    rstbuddy --help
-
-    # Show settings
-    rstbuddy settings
-
-Expected output for version command:
-
-.. code-block:: text
-
-    ┌─────────────────────────────────────────────────────────────────┐
-    │                      rstbuddy Version Info                      │
-    ├─────────────────────────────────────────────────────────────────┤
-    │ Package    │ Version                                            │
-    ├─────────────────────────────────────────────────────────────────┤
-    │ rstbuddy   │ 0.1.0                                              │
-    │ click      │ 8.1.7                                              │
-    │ rich       │ 13.7.0                                             │
-    └─────────────────────────────────────────────────────────────────┘
-
-Optional Dependencies
----------------------
-
-Pandoc Installation
-^^^^^^^^^^^^^^^^^^^
-
-Required only for the AI summarization feature.
-
-**macOS**:
-    .. code-block:: bash
-
-        # Using Homebrew
-        brew install pandoc
-
-        # Verify installation
-        pandoc --version
-
-**Ubuntu/Debian**:
-    .. code-block:: bash
-
-        # Using apt
-        sudo apt update
-        sudo apt install pandoc
-
-        # Verify installation
-        pandoc --version
-
-**Windows**:
-    - Download installer from `PandocOrgInstalling`_
-    - Run the installer and follow the prompts
-    - Restart your terminal after installation
-
-**Verify Pandoc**:
-    .. code-block:: bash
-
-        # Check if pandoc is available
-        pandoc --version
-
-        # Check if it's in PATH
-        which pandoc  # Unix-like systems
-        where pandoc  # Windows
-
-OpenAI API Key Setup
+Using docker compose
 ^^^^^^^^^^^^^^^^^^^^
 
-Required only for the AI summarization feature.
+I'm assuming here you have Docker Desktop installed.  If you don't, you can
+install it from `Docker Desktop <https://www.docker.com/products/docker-desktop/>`_.
 
-**Get API Key**:
-    1. Sign up at `PlatformOpenaiCom`_
-    2. Navigate to API Keys section
-    3. Create a new API key
-    4. Copy the key (starts with "sk-")
+I'm also assuming you have a ``nginx`` configuration file in ``./etc/nginx/nginx.conf`` and
+SSL certificates in ``./etc/nginx/certs``.  If you don't, you can create them.
 
-**Configure API Key**:
-    .. code-block:: bash
+Here's an example ``docker-compose.yml`` file:
 
-        # Set as environment variable
-        export RSTBUDDY_OPENAI_API_KEY="sk-your-actual-api-key-here"
+.. code-block:: yaml
 
-        # Or add to configuration file
-        echo 'openai_api_key = "sk-your-actual-api-key-here"' >> ~/.config/.rstbuddy.toml
+    nginx:
+      image: nginx:latest
+      container_name: nginx
+      ports:
+        - "8443:443"
+      volumes:
+        - ./etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+        - ./etc/nginx/certs:/certs
 
-**Verify Configuration**:
-    .. code-block:: bash
+    nginx_statsd_sidecar:
+      image: caltechads/nginx_statsd_sidecar:0.2.0
+      container_name: nginx_statsd_sidecar
+      environment:
+        - NGINX_HOST=nginx
+        # Note that you need to use the container port here, not the host port.
+        - NGINX_PORT=443
+        - NGINX_STATUS_PATH=/server-status
+        - STATSD_HOST=statsd.example.com
+        - STATSD_PREFIX=myapp.nginx
+      links:
+        - nginx
 
-        # Check if API key is loaded
-        rstbuddy settings | grep openai_api_key
+This will:
 
-Platform-Specific Instructions
-------------------------------
+- Start an ``nginx`` container and a ``nginx_statsd_sidecar`` container
+- ``nginx_statsd_sidecar`` will:
 
-macOS
-^^^^^
+    - scrape stats from ``nginx:443``, path ``/server-status`` on port 443 using SSL
+    - Report them every 10 seconds and to ``statsd.example.com``
+    - The stats will be reported with the prefix ``myapp.nginx``
 
-**Using Homebrew**:
-    .. code-block:: bash
+Assuming you're using graphite to store your metric data, the stats will be available
+at the following paths:
 
-        # Install Python if needed
-        brew install python@3.11
+- ``stats.myapp.nginx.requests``
+- ``stats.myapp.nginx.active_connections``
+- ``stats.myapp.nginx.workers.reading``
+- ``stats.myapp.nginx.workers.writing``
+- ``stats.myapp.nginx.workers.waiting``
 
-        # Install rstbuddy
-        brew install rstbuddy
+Using deployfish
+^^^^^^^^^^^^^^^^
 
-        # Or use uv (recommended)
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        uv tool install rstbuddy
+``deployfish`` is a tool for deploying Docker containers to AWS ECS that we use at Caltech.  It's
+available on `GitHub: deployfish <https://github.com/caltechads/deployfish>`_.
 
-**Using MacPorts**:
-    .. code-block:: bash
+Let's say you have a ``myapp`` container that runs ``nginx`` on port 8443 using SSL and you want to
+forward the stats to ``statsd.example.com`` with the prefix ``myapp.nginx``.
 
-        # Install Python if needed
-        sudo port install python311
+Here's a ``deployfish.yml`` file that will deploy the ``nginx_statsd_sidecar`` container to AWS ECS:
 
-        # Install rstbuddy
-        sudo port install rstbuddy
+.. code-block:: yaml
 
-Linux (Ubuntu/Debian)
-^^^^^^^^^^^^^^^^^^^^^
+    services:
+      - name: myapp-prod
+        cluster: my-cluster
+        environment: prod
+        count: 1
+        load_balancer:
+          target_group_arn: arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-app/123456789012
+          container_name: myapp
+          container_port: 8443
+        family: myapp-prod
+        launch_type: FARGATE
+        network_mode: awsvpc
+        enable_exec: true
+        vpc_configuration:
+          subnets: subnet-01234567890123456,subnet-01234567890123457
+          security_groups: sg-01234567890123456
+        task_role_arn: arn:aws:iam::123456789012:role/my-app-task-role
+        execution_role: arn:aws:iam::123456789012:role/my-app-execution-role
+        cpu: 2048
+        memory: 4096
+        containers:
+          - name: myapp
+            image: my-org/myapp:latest
+            cpu: 1920
+            memory: 3840
+            ports:
+              - 8443:8443
+            logging:
+              driver: awslogs
+              options:
+                awslogs-group: /my/loggroup
+                awslogs-region: us-west-2
+                awslogs-stream-prefix: myapp-prod
+          - name: nginx_statsd_sidecar
+            image: caltechads/nginx_statsd_sidecar:0.2.0
+            cpu: 128
+            memory: 256
+            environment:
+              # The name of the container running nginx.
+              - NGINX_HOST=myapp
+              # Note that you need to use the container port here, not the host port.
+              - NGINX_PORT=8443
+              - NGINX_STATUS_PATH=/server-status
+              - STATSD_HOST=statsd.example.com
+              - STATSD_PREFIX=myapp.nginx
+            logging:
+              driver: awslogs
+              options:
+                awslogs-group: /my/loggroup
+                awslogs-region: my-region
+                awslogs-stream-prefix: myapp-prod
 
-**System Packages**:
-    .. code-block:: bash
 
-        # Update package list
-        sudo apt update
+This will:
 
-        # Install Python if needed
-        sudo apt install python3 python3-pip python3-venv
+- Start a single task with two containers: ``myapp`` and ``nginx_statsd_sidecar``
+- ``myapp`` will run ``nginx`` on port 8443 using SSL, and has the ``ngx_http_stub_status_module`` enabled on the ``/server-status`` path
+- ``nginx_statsd_sidecar`` will scrape stats from the ``myapp`` container, port 8443, path ``/server-status`` using SSL
+- ``nginx_statsd_sidecar`` will report them every 10 seconds to ``statsd.example.com``
+- The stats will be reported with the prefix ``myapp.nginx``
+- The stats will be available at the following paths:
 
-        # Install rstbuddy
-        pip3 install --user rstbuddy
+    - ``stats.myapp.nginx.requests``
+    - ``stats.myapp.nginx.active_connections``
+    - ``stats.myapp.nginx.workers.reading``
+    - ``stats.myapp.nginx.workers.writing``
+    - ``stats.myapp.nginx.workers.waiting``
 
-        # Add to PATH if needed
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-        source ~/.bashrc
+- The Fargate task will have 2048 CPU and 4096 MB of memory
+- The ``myapp`` container will have 1920 CPU and 3840 MB of memory
+- The ``nginx_statsd_sidecar`` container will have 128 CPU and 256 MB of memory
+- Note that we restrict the ``nginx_statsd_sidecar`` container to 128 CPU and 256 MB of memory to avoid
+  using too much memory on the Fargate task, leaving most for your app.
 
-**Using uv (Recommended)**:
-    .. code-block:: bash
+ECS Task definition JSON
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-        # Install uv
-        curl -LsSf https://astral.sh/uv/install.sh | sh
+Here's a JSON file that will create an ECS Task definition for the ``nginx_statsd_sidecar`` container:
 
-        # Add to PATH
-        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-        source ~/.bashrc
+.. code-block:: json
 
-        # Install rstbuddy
-        uv tool install rstbuddy
-
-Linux (CentOS/RHEL/Fedora)
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Using dnf/yum**:
-    .. code-block:: bash
-
-        # Install Python if needed
-        sudo dnf install python3 python3-pip
-
-        # Install rstbuddy
-        pip3 install --user rstbuddy
-
-**Using uv (Recommended)**:
-    .. code-block:: bash
-
-        # Install uv
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-
-        # Install rstbuddy
-        uv tool install rstbuddy
-
-Windows
-^^^^^^^
-
-**Using pip**:
-    .. code-block:: bash
-
-        # Install Python from https://python.org
-        # Ensure "Add Python to PATH" is checked during installation
-
-        # Open Command Prompt or PowerShell
-        pip install rstbuddy
-
-        # Verify installation
-        rstbuddy --version
-
-**Using uv (Recommended)**:
-    .. code-block:: powershell
-
-        # Install uv using PowerShell
-        irm https://astral.sh/uv/install.ps1 | iex
-
-        # Restart PowerShell, then install rstbuddy
-        uv tool install rstbuddy
-
-**Using Chocolatey**:
-    .. code-block:: powershell
-
-        # Install Chocolatey first, then:
-        choco install rstbuddy
-
-**Using Scoop**:
-    .. code-block:: powershell
-
-        # Install Scoop first, then:
-        scoop install rstbuddy
+    {
+        # ...
+        "containerDefinitions": [
+        {
+            "name": "myapp",
+            "image": "my-org/myapp:latest",
+            "essential": true,
+            "portMappings": [
+                {
+                    "containerPort": 8443,
+                    "protocol": "tcp"
+                }
+            ],
+            # ...
+        },
+        {
+            "name": "nginx-statsd-sidecar",
+            "image": "caltechads/nginx_statsd_sidecar:latest",
+            "essential": false,
+            "environment": [
+                {
+                    "name": "NGINX_HOST",
+                    "value": "myapp"
+                },
+                {
+                    "name": "NGINX_PORT",
+                    "value": "8443"
+                },
+                {
+                    "name": "NGINX_STATUS_PATH",
+                    "value": "/server-status"
+                },
+                {
+                    "name": "STATSD_HOST",
+                    "value": "statsd.example.com"
+                },
+                {
+                    "name": "STATSD_PREFIX",
+                    "value": "myapp.nginx"
+                }
+            ],
+            # ...
+        },
+        # ...
+    }
 
 
 Troubleshooting
 ---------------
 
-Installation Issues
-^^^^^^^^^^^^^^^^^^^
-
-**"command not found" after installation**:
-    .. code-block:: bash
-
-        # Check if rstbuddy is in PATH
-        which rstbuddy
-
-        # Check installation location
-        pip show rstbuddy
-
-        # Add to PATH if needed
-        export PATH="$HOME/.local/bin:$PATH"
-
-**Permission denied errors**:
-    .. code-block:: bash
-
-        # Install for current user only
-        pip install --user rstbuddy
-
-        # Or use virtual environment
-        python -m venv rstbuddy-env
-        source rstbuddy-env/bin/activate
-        pip install rstbuddy
-
-**Python version issues**:
-    .. code-block:: bash
-
-        # Check Python version
-        python3 --version
-
-        # Ensure Python 3.10+ is installed
-        # Use pyenv or similar to manage Python versions
-
-**Package conflicts**:
-    .. code-block:: bash
-
-        # Use virtual environment
-        python -m venv rstbuddy-env
-        source rstbuddy-env/bin/activate
-        pip install rstbuddy
-
-        # Or use uv for better dependency resolution
-        uv tool install rstbuddy
-
-Verification Issues
-^^^^^^^^^^^^^^^^^^^
-
-**Version command fails**:
-    .. code-block:: bash
-
-        # Check if rstbuddy is properly installed
-        pip list | grep rstbuddy
-
-        # Try running with Python module syntax
-        python -m rstbuddy --version
-
-        # Check for import errors
-        python -c "import rstbuddy; print(rstbuddy.__version__)"
-
-**Settings command fails**:
-    .. code-block:: bash
-
-        # Check configuration file permissions
-        ls -la ~/.config/.rstbuddy.toml
-
-        # Try with verbose output
-        rstbuddy --verbose settings
-
-        # Check for configuration errors
-        rstbuddy --config-file /dev/null settings
+See :doc:`/overview/faq` for troubleshooting tips.
 
 Getting Help
 ------------
 
 If you encounter installation issues:
 
-1. **Check Prerequisites**: Ensure Python 3.10+ is installed
-2. **Verify PATH**: Ensure installation directory is in your PATH
-3. **Check Permissions**: Ensure you have write permissions for installation
-4. **Use Virtual Environment**: Isolate dependencies to avoid conflicts
-5. **Try Alternative Methods**: Use uv or pipx instead of pip
-6. **Report Issues**: Open an issue on GitHub with detailed error information
-
-**Useful Commands**:
-    .. code-block:: bash
-
-        # Check Python version
-        python3 --version
-
-        # Check pip version
-        pip --version
-
-        # Check PATH
-        echo $PATH
-
-        # Check installation location
-        pip show rstbuddy
-
-        # Check for conflicts
-        pip check
+1. **Read the docs**: :doc:`/overview/installation`
+2. **Check the FAQ**: :doc:`/overview/faq`
+3. **Report Issues**: Open an issue on GitHub with detailed error information

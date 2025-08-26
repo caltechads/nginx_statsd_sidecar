@@ -1,163 +1,189 @@
 Quickstart Guide
 ================
 
-This guide will get you up and running with ``rstbuddy`` quickly, showing the
-command-line interface for working with reStructuredText (RST) files.
+This guide will get you up and running with ``nginx_statsd_sidecar`` quickly,
+showing the ``nginx`` configuration and a ``docker-compose.yml`` file to run both it
+and the ``nginx_statsd_sidecar`` container.
+
+.. note::
+
+    For a `deployfish <https://github.com/caltechads/deployfish>`_ example, see
+    :doc:`/overview/installation`.
 
 Prerequisites
 -------------
 
-- Python 3.11 or higher
-- Follow the :doc:`/overview/installation` instructions to install ``rstbuddy``
-- Pandoc (optional, required only for AI summarization feature)
-- OpenAI API key (optional, required only for AI summarization feature)
+- Docker Desktop
 
 Configuration
 -------------
 
-Typically the defaults that ship with ``rstbuddy`` will work.
+Let's start with the ``nginx`` configuration.  We can use the official ``nginx``
+docker image, create our own ``nginx.conf`` file and mount it into the container
+along with some certs.
 
-You can configure ``rstbuddy`` using configuration files or environment
-variables. See :doc:`/overview/configuration` for more details.
-
-Basic Usage
------------
-
-Get Help
-^^^^^^^^
+First ensure that ``nginx`` has been compiled with the ``ngx_http_stub_status_module`` module;
+it usually is.
 
 .. code-block:: bash
 
-    # Show main help
-    rstbuddy --help
+    $ docker run --rm nginx:latest nginx -V
 
-    # Show help for specific commands
-    rstbuddy check-links --help
-    rstbuddy fix --help
-    rstbuddy gather-links --help
-    rstbuddy summarize --help
-    rstbuddy outline-to-rst --help
-    rstbuddy settings --help
+If you see ``--with-http_stub_status_module`` in the output, you're good to go.
 
-Check Links Usage
-^^^^^^^^^^^^^^^^^
+Now create a ``nginx.conf`` file that looks like this:
 
-.. code-block:: bash
+.. code-block:: text
 
-    # Check all links in default doc/source directory
-    rstbuddy check-links
+    user nginx;
+    worker_processes auto;
 
-    # Check links in specific directory
-    rstbuddy check-links /path/to/docs
+    error_log  /dev/stderr info;
+    pid /tmp/nginx.pid;
 
-    # Use custom timeout and workers
-    rstbuddy check-links --timeout 10 --max-workers 16
+    events {
+      worker_connections 1024;
+    }
 
-    # Skip robots.txt checks
-    rstbuddy check-links --no-check-robots
 
-Gather Links Usage
-^^^^^^^^^^^^^^^^^^
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
 
-.. code-block:: bash
+      # Write our logs a JSON to stdout, just like a good citizen.
+      log_format json_combined escape=json
+      '{'
+          '"type": "access", '
+          '"program": "nginx", '
+          '"time_local": "$time_iso8601", '
+          '"remote_addr": "$http_x_forwarded_for", '
+          '"remote_user": "$http_user", '
+          '"request": "$request", '
+          '"status": "$status", '
+          '"method": "$request_method", '
+          '"path": "$uri", '
+          '"response_length": "$body_bytes_sent", '
+          '"request_time": "$request_time", '
+          '"http_referrer": "$http_referer", '
+          '"http_user_agent": "$http_user_agent", '
+          '"host": "$http_host" '
+      '}';
+      access_log /dev/stdout json_combined;
 
-    # Gather all hyperlinks from the documentation directory, add them to
-    # <documentation_dir>/_links.rst, replace the links in the text with
-    # refereces to links in _links.rst and update conf.py to include them in the
-    # epilog.
-    rstbuddy gather-links
+      sendfile on;
+      tcp_nopush on;
 
-    # Preview changes without modifying the files
-    rstbuddy gather-links --dry-run
+      server {
+        listen 443 ssl http2;
+        server_name localhost;
 
-Fix RST Files Usage
-^^^^^^^^^^^^^^^^^^^
+        # Don't send the nginx version number in error pages or the Server header.
+        server_tokens off;
 
-.. code-block:: bash
+        ssl_certificate /certs/localhost.crt;
+        ssl_certificate_key /certs/localhost.key;
 
-    # Fix a single RST file (creates backup automatically)
-    rstbuddy fix document.rst
+        ssl_session_cache shared:SSL:50m;
+        ssl_session_timeout 1d;
+        ssl_session_tickets on;
+        add_header Strict-Transport-Security "max-age=63072000";
+        add_header X-XSS-Protection "1; mode=block";
 
-    # Preview changes without modifying the file
-    rstbuddy fix document.rst --dry-run
+        # Disable the TRACE and TRACK methods.
+        if ($request_method ~ ^(TRACE|TRACK)$ ) {
+           return 405;
+        }
 
-    # Fix multiple files at a time
-    find . -name "*.rst" -exec rstbuddy fix {} \;
+        location = /server-status {
+            stub_status;
+            allow 127.0.0.1;
+            allow ::1;
+            allow 192.168.0.0/24;
+            deny all;
+        }
 
-AI Summarization Usage
-^^^^^^^^^^^^^^^^^^^^^^
+        location = /favicon.ico { access_log off; log_not_found off; }
 
-.. important::
+        location / {
+            root   /usr/share/nginx/html;
+            index  index.html index.htm;
+        }
 
-    **OpenAI API Key Required**: This feature requires a valid OpenAI API key.
-    See :doc:`/overview/configuration` for setup instructions.
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+      }
+    }
 
-.. code-block:: bash
-
-    # Generate AI summary of an RST file
-    rstbuddy summarize document.rst
-
-    # Use with custom configuration
-    rstbuddy --config-file ai-config.toml summarize document.rst
-
-Outline Conversion Usage
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. important::
-
-    **Pandoc Required**: This feature requires Pandoc to be installed.
-    See :doc:`/overview/installation` for Pandoc installation instructions.
-
-.. code-block:: bash
-
-    # Convert a markdown outline to RST documentation structure
-    rstbuddy outline-to-rst outline.md
-
-    # Convert with custom output directory
-    rstbuddy outline-to-rst outline.md --output-dir ./docs
-
-    # Preview what would be created without making changes
-    rstbuddy outline-to-rst outline.md --dry-run
-
-    # Force overwrite existing files (creates backups)
-    rstbuddy outline-to-rst outline.md --force
-
-Settings Usage
-^^^^^^^^^^^^^^
+Finally, create a ``certs`` directory and put your SSL certificates in it.
 
 .. code-block:: bash
 
-    # Show all current settings
-    rstbuddy settings
+    $ mkdir -p certs
+    # Generate a self-signed SSL cert for nginx to use, good for 10 years.
+    $ openssl req -x509 -nodes \
+        -days 3650 \
+        -subj "/CN=localhost"
+        -newkey rsa:4096 \
+        -keyout certs/localhost.key \
+        -out certs/localhost.crt
 
-    # Show settings in JSON format
-    rstbuddy --output json settings
 
-    # Show settings in text format
-    rstbuddy --output text settings
+Docker Compose
+--------------
 
-Output Formats
-^^^^^^^^^^^^^^
+Create a ``docker-compose.yml`` file that looks like this:
+
+.. code-block:: yaml
+
+    ---
+    services:
+
+      nginx:
+        image: nginx:latest
+        container_name: nginx
+        ports:
+          - "8443:443"
+        volumes:
+          - ./nginx.conf:/etc/nginx/nginx.conf
+          - ./certs:/certs
+
+      nginx_statsd:
+        image: nginx_statsd_sidecar:latest
+        container_name: nginx_statsd
+        environment:
+          - NGINX_HOST=nginx
+          # Note that you need to use the container port here, not the host port.
+          - NGINX_PORT=443
+          - STATSD_HOST=statsd.example.com
+          - STATSD_PREFIX=test.nginx
+        links:
+          - nginx
+        volumes:
+          - .:/app
+
+Run it
+------
 
 .. code-block:: bash
 
-    # Use table format (default) for human reading
-    rstbuddy check-links --output table
+    $ docker compose up
 
-    # Use JSON format for scripting
-    rstbuddy check-links --output json
+After any pulls are done, you should see the following output:
 
-    # Use text format for simple output
-    rstbuddy check-links --output text
+.. code-block:: text
 
-Next Steps
-----------
+    nginx_statsd  | {"message": "HTTP Request: GET https://nginx/server-status \"HTTP/2 200 OK\""}
+    nginx_statsd  | {"message": "reporter.success", "retrieved": true, "active_connections": 1, "requests": 1, "reading": 0, "writing": 1, "waiting": 0}
 
-Now that you have the basics working:
+Go to ``https://localhost:8443/`` and refresh a bunch of times and you'll see
+the stats being reported to ``statsd.example.com``.
 
-1. **Usage**: See :doc:`/overview/usage` for more advanced features and detailed examples.
-2. **Configuration**: See :doc:`/overview/configuration` for configuration options.
-3. **Troubleshooting**: See the troubleshooting sections in each guide for common issues.
+.. code-block:: text
+
+    nginx_statsd  | {"message": "reporter.success", "retrieved": true, "active_connections": 5, "requests": 10, "reading": 0, "writing": 3, "waiting": 2}
+
 
 Getting Help
 ------------
@@ -165,62 +191,3 @@ Getting Help
 - Check the full documentation for detailed examples
 - Review the troubleshooting sections in each guide
 - Report issues on the GitHub repository
-
-Common Workflows
-----------------
-
-Documentation Maintenance
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    # 1. Check for broken links
-    rstbuddy check-links
-
-    # 2. Fix formatting issues
-    rstbuddy fix /path/to/rst_file.rst
-
-    # 3. Verify fixes
-    rstbuddy check-links
-
-Content Migration
-^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    # 1. Fix Markdown-to-RST conversion issues
-    rstbuddy fix migrated_document.rst
-
-    # 2. Check that all internal links work
-    rstbuddy check-links
-
-    # 3. Generate summary (if AI features enabled)
-    rstbuddy summarize migrated_document.rst
-
-Outline Conversion
-^^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    # 1. Convert markdown outline to RST structure
-    rstbuddy outline-to-rst outline.md --dry-run
-
-    # 2. Review the planned structure
-    rstbuddy outline-to-rst outline.md
-
-    # 3. Check that all generated links work
-    rstbuddy check-links ./output_directory
-
-Quality Assurance
-^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    # 1. Validate all documentation links
-    rstbuddy check-links /path/to/docs
-
-    # 2. Fix any formatting issues
-    find /path/to/docs -name "*.rst" -exec rstbuddy fix {} \;
-
-    # 3. Re-check links to ensure fixes worked
-    rstbuddy check-links /path/to/docs
