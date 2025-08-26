@@ -33,20 +33,20 @@ check-clean:
 # Shared release recipe. Expects BUMP=dev|patch|minor|major
 _release: compile check-branch check-clean
 	@echo "Releasing $(BUMP) version"
-	@git add requirements.txt
-	# Commit may be a no-op if nothing changed; don't fail the release on that
-	@git commit -m "DEV: Updated requirements.txt" || true
 	@bumpversion $(BUMP)
 	@bin/release.sh
 
 # Generate "release-<type>" targets that pass BUMP through
-release-%: FORCE
+release-%:
 	@case "$*" in dev|patch|minor|major) ;; \
 	  *) echo "Invalid release type: $*"; exit 1;; esac
 	@$(MAKE) _release BUMP=$*
 
 compile: uv.lock
 	@uv pip compile --group=docs pyproject.toml -o requirements.txt
+	@git add requirements.txt
+	# Commit may be a no-op if nothing changed; don't fail the release on that
+	@git commit -m "DEV: Updated requirements.txt" || true
 
 build:
 	docker buildx build --platform linux/amd64,linux/arm64 -t ${PACKAGE}:${VERSION} .
