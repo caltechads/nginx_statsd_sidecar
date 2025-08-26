@@ -4,6 +4,9 @@ PACKAGE = nginx_statsd_sidecar
 
 DOCKER_REGISTRY = caltechads
 
+.PHONY: check-branch check-clean _release
+.PHONY: FORCE
+
 #======================================================================
 
 clean:
@@ -13,15 +16,40 @@ clean:
 dist: clean
 	@uv build --sdist --wheel
 
-release: dist
+
+# Allow overriding the main branch (defaults to master)
+MAIN_BRANCH ?= master
+
+# Gate checks
+check-branch:
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	test "$$branch" = "$(MAIN_BRANCH)" || { \
+	  echo "You're not on $(MAIN_BRANCH); aborting."; exit 1; }
+
+check-clean:
+	@test -z "$$(git status --untracked-files=no --porcelain)" || { \
+	  echo "You have uncommitted changes; aborting."; exit 1; }
+
+# Shared release recipe. Expects BUMP=dev|patch|minor|major
+_release: compile check-branch check-clean
+	@echo "Releasing $(BUMP) version"
+	@git add requirements.txt
+	# Commit may be a no-op if nothing changed; don't fail the release on that
+	@git commit -m "DEV: Updated requirements.txt" || true
+	@bumpversion $(BUMP)
 	@bin/release.sh
+
+# Generate "release-<type>" targets that pass BUMP through
+release-%: FORCE
+	@case "$*" in dev|patch|minor|major) ;; \
+	  *) echo "Invalid release type: $*"; exit 1;; esac
+	@$(MAKE) _release BUMP=$*
 
 compile: uv.lock
 	@uv pip compile --group=docs pyproject.toml -o requirements.txt
 
-
 build:
-	docker build -t ${PACKAGE}:${VERSION} .
+	docker buildx build --platform linux/amd64,linux/arm64 -t ${PACKAGE}:${VERSION} .
 	docker tag ${PACKAGE}:${VERSION} ${PACKAGE}:latest
 	docker image prune -f
 
