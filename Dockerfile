@@ -58,6 +58,7 @@ ENV HISTCONTROL=ignorespace:ignoredups  \
 
 RUN apk update && \
     apk upgrade && \
+    apk add --no-cache nmap curl && \
     # Set the container's timezone to Los Angeles time.
     ln -snf /usr/share/zoneinfo/America/Los_Angeles /etc/localtime && \
     rm -r /usr/share/zoneinfo/Africa && \
