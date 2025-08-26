@@ -1,6 +1,6 @@
 [project]
 name = "nginx_statsd_sidecar"
-version = "0.2.0"
+version = "0.2.1"
 description = "A sidecar for nginx to send statsd metrics to a statsd server"
 readme = "README.md"
 requires-python = ">=3.11"

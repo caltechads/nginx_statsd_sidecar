@@ -10,8 +10,8 @@ The package includes:
 - Configuration management with environment variable support
 - JSON logging for containerized environments
 
-Version: 0.2.0
+Version: 0.2.1
 """
 
 #: Current version of the nginx_statsd_sidecar package
-__version__ = "0.2.0"
+__version__ = "0.2.1"
