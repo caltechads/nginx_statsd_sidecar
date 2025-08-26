@@ -17,4 +17,4 @@ configurable via an environment variable).
 
 ## Documentation
 
-Please see <nginx_statsd_sidecar.readthedocs.io> for the full set of docs.
+Please see <https://nginx_statsd-sidecar.readthedocs.io> for the full set of docs.
