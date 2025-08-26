@@ -4,7 +4,7 @@ PACKAGE = nginx_statsd_sidecar
 
 DOCKER_REGISTRY = caltechads
 
-.PHONY: check-branch check-clean _release
+.PHONY: check-branch check-clean _release build force-build tag push pull scout dev dev-detached devdown restart exec log logall docker-clean docker-destroy
 .PHONY: FORCE
 
 #======================================================================
