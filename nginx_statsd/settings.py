@@ -86,6 +86,7 @@ class Settings(BaseSettings):
                 >>> settings = Settings(nginx_is_https=False, nginx_port=8080)
                 >>> settings.status_url
                 'http://localhost:8080/server-status'
+
         """
         url = f"//{self.nginx_host}:{self.nginx_port}{self.nginx_status_path}"
         if self.nginx_is_https:
