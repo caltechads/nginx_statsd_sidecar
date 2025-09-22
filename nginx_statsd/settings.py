@@ -70,6 +70,7 @@ class Settings(BaseSettings):
         path information with the appropriate protocol (HTTP or HTTPS).
 
         The URL format follows the pattern:
+
         - HTTPS: https://{host}:{port}{path}
         - HTTP: http://{host}:{port}{path}
 
